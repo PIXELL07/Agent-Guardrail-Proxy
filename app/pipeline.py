@@ -27,6 +27,7 @@ from app.detectors.similarity_detector import SimilarityDetector
 from app.detectors.classifier_detector import InjectionClassifier
 from app.detectors.llm_judge import judge
 from app.schemas import ToolCallPayload, InspectResponse, TierResult
+from app.config import settings
 
 # Confidence band: if both cheap tiers land inside this range, we're not
 # confident enough to decide without the judge model.
@@ -37,17 +38,18 @@ from app.schemas import ToolCallPayload, InspectResponse, TierResult
 # original 0.25 floor, so every ordinary tool call was being escalated to
 # the (slow, costly) judge model. Raised to 0.35 based on the actual
 # confidence distribution observed on benign vs. genuinely ambiguous text
-# during testing.
-AMBIGUOUS_LOW = 0.35
-AMBIGUOUS_HIGH = 0.6
+# during testing. Both values are configurable via settings so they can be
+# retuned without a code change as real production traffic is observed.
+AMBIGUOUS_LOW = settings.ambiguous_low
+AMBIGUOUS_HIGH = settings.ambiguous_high
 
 
 class DetectionPipeline:
-    def __init__(self, judge_backend: str = "ollama"):
+    def __init__(self, judge_backend: str | None = None):
         # Fit the similarity/classifier models once at startup, not per request.
         self.similarity = SimilarityDetector()
         self.classifier = InjectionClassifier()
-        self.judge_backend = judge_backend
+        self.judge_backend = judge_backend or settings.judge_backend
 
     def _combined_text(self, payload: ToolCallPayload) -> str:
         """Flatten everything worth inspecting into one text blob."""
@@ -74,7 +76,19 @@ class DetectionPipeline:
 
         if sim_result.triggered or clf_result.triggered:
             triggering = sim_result if sim_result.triggered else clf_result
-            return self._finish(payload, tier_results, "block", triggering, start)
+            # Report the resolved tier as the unified "similarity+classifier"
+            # label -- same one used for the allow path below -- so the
+            # funnel breakdown in /v1/stats has one consistent tier-2
+            # bucket instead of splitting into "similarity" vs "classifier"
+            # depending on which sub-detector happened to fire. The
+            # specific sub-detector's reasoning is preserved in `reason`.
+            normalized = TierResult(
+                tier="similarity+classifier",
+                triggered=True,
+                confidence=triggering.confidence,
+                reason=triggering.reason,
+            )
+            return self._finish(payload, tier_results, "block", normalized, start)
 
         # Both tier-2 detectors confidently say benign -> allow without
         # paying for the judge model.
@@ -104,7 +118,7 @@ class DetectionPipeline:
         latency_ms = (time.perf_counter() - start) * 1000
         return InspectResponse(
             decision=decision,
-            triggered_tier=deciding_tier.tier if decision == "block" else None,
+            resolved_tier=deciding_tier.tier,
             confidence=deciding_tier.confidence,
             reason=deciding_tier.reason,
             tier_results=tier_results,
