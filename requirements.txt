@@ -1,8 +1,10 @@
 fastapi
 uvicorn
 pydantic
+pydantic-settings
 scikit-learn
 numpy
 httpx
+prometheus-client
 pytest
 pytest-asyncio
