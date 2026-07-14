@@ -1,0 +1,12 @@
+# Caddy automatically obtains and renews a Let's Encrypt TLS certificate
+# for the domain below, and reverse-proxies HTTPS traffic to the backend
+# over plain HTTP on the internal Docker network -- the backend itself
+# never needs to handle certificates.
+#
+# Replace with your real domain before deploying. Caddy needs port 80
+# reachable from the internet for the ACME HTTP-01 challenge, in addition
+# to 443.
+
+{$DOMAIN:localhost} {
+	reverse_proxy backend:8000
+}
