@@ -24,6 +24,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.schemas import TierResult
+from app.config import settings
 
 # A small seed bank of known injection attempts, covering the same
 # categories as the regex tier but phrased differently, plus some
@@ -59,9 +60,9 @@ _THRESHOLD = 0.3  # cosine similarity above this counts as a match
 class SimilarityDetector:
     """Wraps the vectorizer so it's fit once, not on every request."""
 
-    def __init__(self, known_examples: list[str] = _KNOWN_INJECTIONS, threshold: float = _THRESHOLD):
+    def __init__(self, known_examples: list[str] = _KNOWN_INJECTIONS, threshold: float | None = None):
         self.known_examples = known_examples
-        self.threshold = threshold
+        self.threshold = threshold if threshold is not None else settings.similarity_threshold
         self.vectorizer = TfidfVectorizer(ngram_range=(1, 2), min_df=1)
         self._known_matrix = self.vectorizer.fit_transform(self.known_examples)
 
