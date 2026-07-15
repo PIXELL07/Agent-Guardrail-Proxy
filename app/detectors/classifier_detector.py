@@ -23,6 +23,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
 from app.schemas import TierResult
+from app.config import settings
 
 # Small labeled seed set: 1 = injection attempt, 0 = benign tool-call text.
 # In production this should be replaced/augmented with real labeled
@@ -77,8 +78,8 @@ _TRAINING_DATA: list[tuple[str, int]] = [
 
 
 class InjectionClassifier:
-    def __init__(self, threshold: float = 0.5):
-        self.threshold = threshold
+    def __init__(self, threshold: float | None = None):
+        self.threshold = threshold if threshold is not None else settings.classifier_threshold
         texts = [t for t, _ in _TRAINING_DATA]
         labels = [l for _, l in _TRAINING_DATA]
         self.pipeline = Pipeline(
