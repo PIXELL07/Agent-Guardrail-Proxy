@@ -1,0 +1,53 @@
+# Production overlay: adds TLS termination via Caddy in front of the
+# backend. Use together with the base compose file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+#
+# Also set, at minimum, in your .env:
+#   ENVIRONMENT=production
+#   CORS_ORIGINS=https://your-real-frontend-origin.com
+#   DOMAIN=your-api-domain.com
+#   API_KEYS=<a real random value, not dev-local-key>
+#
+# Note: the base docker-compose.yml already binds the backend's port to
+# 127.0.0.1 only (not 0.0.0.0), which is what actually keeps it off the
+# public internet -- Compose merges list fields like `ports` across -f
+# files by concatenation on some versions, so this overlay doesn't rely
+# on being able to *remove* that mapping, only on Caddy fronting it.
+#
+# The backend refuses to start with ENVIRONMENT=production and a wildcard
+# CORS origin (see app/main.py's check_production_cors_safety) -- that's
+# deliberate, not a bug in this compose file.
+
+services:
+  backend:
+    environment:
+      - API_KEYS=${API_KEYS}
+      - ENVIRONMENT=production
+      - JUDGE_BACKEND=${JUDGE_BACKEND:-ollama}
+      - OLLAMA_URL=http://ollama:11434/api/chat
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DB_PATH=/data/guardrail.db
+      - CORS_ORIGINS=${CORS_ORIGINS}
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
