@@ -1,0 +1,36 @@
+services:
+  backend:
+    build: .
+    ports:
+      # Bound to loopback only, not 0.0.0.0 -- this is what actually keeps
+      # the backend off the public internet when Caddy is added in front
+      # via docker-compose.prod.yml, regardless of whether that overlay's
+      # `ports` merge behaves as expected (Compose merges list fields
+      # across -f files by concatenation on older versions, so relying on
+      # the overlay alone to *remove* this mapping isn't safe by itself).
+      - "127.0.0.1:8000:8000"
+    environment:
+      - API_KEYS=${API_KEYS:-dev-local-key}
+      - JUDGE_BACKEND=${JUDGE_BACKEND:-ollama}
+      - OLLAMA_URL=http://ollama:11434/api/chat
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DB_PATH=/data/guardrail.db
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    volumes:
+      - guardrail_data:/data
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  guardrail_data:
+  ollama_data:
