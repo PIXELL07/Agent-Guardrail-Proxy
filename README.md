@@ -197,7 +197,7 @@ integration, the HTTP layer (auth, rate limiting, payload limits, health
 states), API key issuance/revocation/scoping, the metrics endpoint, and
 the production CORS safety guard.
 
-## Real bugs found during development (worth knowing for interviews)
+## Real bugs found during development
 
 1. **Classifier false-positive on data-like arguments.** The initial
    classifier training set only had full benign *sentences*, so short,
@@ -238,7 +238,7 @@ the production CORS safety guard.
    `key_name`) and fixed the harness (now calls `configure_logging()` too),
    so this class of bug can't hide behind an incomplete test setup again.
 
-## Not yet built / real gaps that remain
+## Not yet built (To build in future)
 
 - **SQLite write concurrency has a ceiling.** WAL mode + busy_timeout
   raise it meaningfully for a single instance, but multiple instances
